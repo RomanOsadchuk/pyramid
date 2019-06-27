@@ -1,0 +1,5 @@
+<ul>
+  {% for profile in profile_list %}
+    <li>{{ profile.user.username }} - {{ profile.points }}</li>
+  {% endfor %}
+</ul>
