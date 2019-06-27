@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -5,6 +6,19 @@ from django import forms
 
 from .models import Profile
 from .tokens import sign_up_token_generator
+
+
+class SignInForm(forms.Form):
+    email = forms.EmailField()
+    password = forms.CharField(widget=forms.PasswordInput)
+
+    def clean(self):
+        email = self.cleaned_data['email']
+        password = self.cleaned_data['password']
+        user = authenticate(username=email, password=password)
+        if user is None:
+            raise ValidationError('Invalid credentials')
+        self.user = user
 
 
 class SignUpForm(forms.Form):
@@ -34,10 +48,12 @@ class SignUpForm(forms.Form):
         return code
 
     def clean(self):
-        password = self.cleaned_data['password']
-        password2 = self.cleaned_data['password2']
-        if password != password2:
-            raise ValidationError('Passwords do not match')
+        if 'password' in self.cleaned_data:
+            # password is valid
+            password = self.cleaned_data['password']
+            password2 = self.cleaned_data['password2']
+            if password != password2:
+                raise ValidationError('Passwords do not match')
 
     def create_user(self, generate_token=True):
         """

@@ -1,5 +1,14 @@
-<ul>
-  {% for profile in profile_list %}
-    <li>{{ profile.user.username }} - {{ profile.points }}</li>
-  {% endfor %}
-</ul>
+{% extends "./base.html" %}
+
+{% block title %}Top Profiles{% endblock %}
+
+{% block content %}
+  <div class="list-group">
+    <li class="list-group-item list-group-item-primary">Top Profiles:</li>
+    {% for profile in profile_list %}
+      <a href="{{ profile.get_absolute_url }}" class="list-group-item list-group-item-action">
+        {{ profile.user.get_full_name }} - {{ profile.points }} points
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

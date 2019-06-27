@@ -2,28 +2,50 @@ from django.contrib.auth import login
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.template.response import TemplateResponse
 from django.views.generic import DetailView, ListView
 from django.views.generic.edit import FormView
 
-from .forms import SignUpForm
+from .forms import SignInForm, SignUpForm
 from .models import Profile
 from .tokens import sign_up_token_generator
 
 
+class SignInView(FormView):
+    form_class = SignInForm
+    template_name = 'profiles/form.html'
+    extra_context = {'form_verb': 'Sign In'}
+
+    def form_valid(self, form):
+        login(self.request, form.user)
+        return redirect(form.user.profile)
+
+
 class SignUpView(FormView):
-    template_name = 'profiles/signup.html'
     form_class = SignUpForm
+    # template_name = 'profiles/form.html'
+    template_name = 'profiles/form.html'
+    extra_context = {'form_verb': 'Sign Up'}
     success_url = '/profiles/confirm/'
 
     def form_valid(self, form):
-        user = form.create_user(generate_confirm_url=True)
+        user = form.create_user(generate_token=True)
         print(user.token)
         # send email
-        return super().form_valid(form)
+        message = 'Confirmation letter sent to ' + form.cleaned_data['email']
+        return TemplateResponse(self.request, 'profiles/message.html',
+                                {'message': message})
 
 
 class ProfileDetail(DetailView):
     model = Profile
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        child_profiles = Profile.objects.filter(parent=self.object)
+        print(child_profiles)
+        context['child_profiles'] = child_profiles
+        return context
 
 
 class TopProfilesList(ListView):
@@ -55,8 +77,3 @@ def confirm_email(request, token):
     user.save()
     login(request, user)
     return redirect(profile)
-
-
-def confirm_needed(request):
-    # dummy view for now
-    return HttpResponse('confirm needed')

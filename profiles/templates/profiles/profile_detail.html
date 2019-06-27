@@ -1,2 +1,27 @@
-<p>{{ profile.user.username }}</p>
-<p>{{ profile.invitation_code }}</p>
+{% extends "./base.html" %}
+
+{% block title %}{{ profile.user.get_full_name }} profile{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">{{ profile.user.get_full_name }}</h5>
+      <h6 class="card-subtitle mb-2 text-muted">{{ profile.points }} points</h6>
+      {% if profile.parent %}
+        <h6 class="card-subtitle mb-2 text-muted">Parent: {{ profile.parent.user.get_full_name }}</h6>
+      {% endif %}
+      <p class="card-text">Invitation Code: {{ profile.invitation_code }}</p>
+    </div>
+  </div>
+
+  {% if child_profiles %}
+    <div class="list-group">
+      <li class="list-group-item list-group-item-primary">Child Profiles:</li>
+      {% for child_profile in child_profiles %}
+        <a href="{{ child_profile.get_absolute_url }}" class="list-group-item list-group-item-action">
+          {{ child_profile.user.get_full_name }} - {{ child_profile.points }} points
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}
