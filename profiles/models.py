@@ -23,7 +23,22 @@ class Profile(models.Model):
             code = get_random_string(length=10)
         return code
 
+    @classmethod
+    def __score_points(cls, current_profile):
+        total = cls.objects.filter(parent=current_profile).count() + 1
+        while total > 0:
+            if not current_profile.parent:
+                current_profile.points = models.F('points') + total
+                current_profile.save()
+                break
+            current_profile.points = models.F('points') + 1
+            current_profile.save()
+            current_profile = current_profile.parent
+            total -= 1
+
     def save(self, *args, **kwargs):
-        if self.pk is None:
+        if self.pk is None:  # new instance
             self.invitation_code = self.generate_code()
+            if self.parent:
+                self.__score_points(self.parent)
         super().save(*args, **kwargs)
