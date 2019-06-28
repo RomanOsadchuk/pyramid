@@ -1,4 +1,5 @@
-from django.contrib.auth import login
+from django.conf import settings
+from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -23,10 +24,8 @@ class SignInView(FormView):
 
 class SignUpView(FormView):
     form_class = SignUpForm
-    # template_name = 'profiles/form.html'
     template_name = 'profiles/form.html'
     extra_context = {'form_verb': 'Sign Up'}
-    success_url = '/profiles/confirm/'
 
     def form_valid(self, form):
         user = form.create_user(generate_token=True)
@@ -66,14 +65,21 @@ def confirm_email(request, token):
         raise PermissionDenied
 
     code = user.invitation_code
-    if not Profile.objects.filter(invitation_code=code).exists():
-        # user changed url or invitator changed code, so...
-        raise PermissionDenied
+    if Profile.objects.filter(invitation_code=code).exists():
+        code_owner = Profile.objects.filter(invitation_code=code)[0]
+    else:
+        code_owner = None
+        if Profile.objects.all().count() >= settings.NO_CODE_REQUIRED_COUNT:
+            raise PermissionDenied
 
-    code_owner = Profile.objects.filter(invitation_code=code)[0]
     profile = Profile(user=user, parent=code_owner)
     profile.save()
     user.is_active = True
     user.save()
     login(request, user)
     return redirect(profile)
+
+
+def signout_view(request):
+    logout(request)
+    return redirect('signin')

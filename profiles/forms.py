@@ -1,8 +1,9 @@
+from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django import forms
 
 from .models import Profile
 from .tokens import sign_up_token_generator
@@ -28,7 +29,7 @@ class SignUpForm(forms.Form):
                                 label='Confirm Password')
     first_name = forms.CharField(max_length=30)
     last_name = forms.CharField(max_length=30)
-    invitation_code = forms.CharField()
+    invitation_code = forms.CharField(required=False)
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -43,6 +44,10 @@ class SignUpForm(forms.Form):
 
     def clean_invitation_code(self):
         code = self.cleaned_data['invitation_code']
+        if Profile.objects.all().count() < settings.NO_CODE_REQUIRED_COUNT:
+            return code.replace('-', '_') or '_'
+        if not code:
+            raise ValidationError('Invitation code is required')
         if not Profile.objects.filter(invitation_code=code).exists():
             raise ValidationError('This code is invalid')
         return code
