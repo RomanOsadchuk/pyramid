@@ -6,12 +6,21 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from .models import Profile
-from .tokens import sign_up_token_generator
+from .tokens import make_confirmation_token
+from .utils import send_confirmation_email
 
 
 class SignInForm(forms.Form):
+    """
+    Has additional user field to store authenticated user there
+    if credentials are right.
+    """
     email = forms.EmailField()
     password = forms.CharField(widget=forms.PasswordInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = None
 
     def clean(self):
         email = self.cleaned_data['email']
@@ -45,7 +54,7 @@ class SignUpForm(forms.Form):
     def clean_invitation_code(self):
         code = self.cleaned_data['invitation_code']
         if Profile.objects.all().count() < settings.NO_CODE_REQUIRED_COUNT:
-            return code.replace('-', '_') or '_'
+            return code
         if not code:
             raise ValidationError('Invitation code is required')
         if not Profile.objects.filter(invitation_code=code).exists():
@@ -53,18 +62,16 @@ class SignUpForm(forms.Form):
         return code
 
     def clean(self):
-        if 'password' in self.cleaned_data:
-            # password is valid
+        if 'password' in self.cleaned_data: # password is valid and secure
             password = self.cleaned_data['password']
             password2 = self.cleaned_data['password2']
             if password != password2:
                 raise ValidationError('Passwords do not match')
 
-    def create_user(self, generate_token=True):
+    def create_inactive_user(self, send_email=True):
         """
-        This method saves inactive user and returns this user object.
-        If generate_token is True - attaching confirmation token it.
-        Use if form is valid.
+        This method saves inactive user and returns created user object.
+        If send_email is True - also sending confirmation email.
         """
         user = User.objects.create_user(username=self.cleaned_data['email'],
                                         email=self.cleaned_data['email'],
@@ -74,7 +81,8 @@ class SignUpForm(forms.Form):
         user.is_active = False
         user.save()
 
-        if generate_token:
+        if send_email:
             code = self.cleaned_data['invitation_code']
-            user.token = sign_up_token_generator.make_token(user, code)
+            token = make_confirmation_token(user, code)
+            send_confirmation_email(self.cleaned_data['email'], token)
         return user

@@ -12,7 +12,9 @@
           Parent: <a href="{{ profile.parent.get_absolute_url }}">{{ profile.parent.user.get_full_name }}</a>
         </h6>
       {% endif %}
-      <p class="card-text">Invitation Code: {{ profile.invitation_code }}</p>
+      {% if request.user.is_authenticated and request.user.profile == profile %}
+        <p class="card-text">Invitation Code: {{ profile.invitation_code }}</p>
+      {% endif %}
     </div>
   </div>
 

@@ -16,6 +16,13 @@ class Profile(models.Model):
     def get_absolute_url(self):
         return reverse('profile-detail', args=[str(self.id)])
 
+    def save(self, *args, **kwargs):
+        if self.pk is None:  # new instance
+            self.invitation_code = self.generate_code()
+            if self.parent:
+                self.__score_points(self.parent)
+        super().save(*args, **kwargs)
+
     @classmethod
     def generate_code(cls):
         code = get_random_string(length=10)
@@ -35,10 +42,3 @@ class Profile(models.Model):
             current_profile.save()
             current_profile = current_profile.parent
             total -= 1
-
-    def save(self, *args, **kwargs):
-        if self.pk is None:  # new instance
-            self.invitation_code = self.generate_code()
-            if self.parent:
-                self.__score_points(self.parent)
-        super().save(*args, **kwargs)

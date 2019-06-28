@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.generic import DetailView, ListView
@@ -9,7 +8,7 @@ from django.views.generic.edit import FormView
 
 from .forms import SignInForm, SignUpForm
 from .models import Profile
-from .tokens import sign_up_token_generator
+from .tokens import confirm_singup_token
 
 
 class SignInView(FormView):
@@ -22,19 +21,48 @@ class SignInView(FormView):
         return redirect(form.user.profile)
 
 
+def signout_view(request):
+    logout(request)
+    return redirect('signin')
+
+
+# ==== Registration views ==== #
+
 class SignUpView(FormView):
     form_class = SignUpForm
     template_name = 'profiles/form.html'
     extra_context = {'form_verb': 'Sign Up'}
 
     def form_valid(self, form):
-        user = form.create_user(generate_token=True)
-        print(user.token)
-        # send email
+        user = form.create_inactive_user(send_email=True)
         message = 'Confirmation letter sent to ' + form.cleaned_data['email']
         return TemplateResponse(self.request, 'profiles/message.html',
                                 {'message': message})
 
+
+def confirm_email(request, token):
+    data = confirm_singup_token(token)
+    if data is None:
+        raise PermissionDenied
+    user, code = data
+
+    if Profile.objects.filter(invitation_code=code).exists():
+        code_owner = Profile.objects.filter(invitation_code=code)[0]
+    else:
+        code_owner = None
+        if Profile.objects.all().count() >= settings.NO_CODE_REQUIRED_COUNT:
+            # bad code. create a view to reenter code and redirect there
+            raise PermissionDenied
+
+    profile = Profile(user=user, parent=code_owner)
+    profile.save()
+    user.is_active = True
+    user.save()
+    login(request, user)
+    return redirect(profile)
+
+
+# ==== Profile views ==== #
 
 class ProfileDetail(DetailView):
     model = Profile
@@ -42,7 +70,6 @@ class ProfileDetail(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         child_profiles = Profile.objects.filter(parent=self.object)
-        print(child_profiles)
         context['child_profiles'] = child_profiles
         return context
 
@@ -57,29 +84,3 @@ class TopProfilesList(ListView):
         queryset = super().get_queryset()
         queryset = queryset.select_related('user')
         return queryset[:self.limit]
-
-
-def confirm_email(request, token):
-    user = sign_up_token_generator.parse_token(token)
-    if user is None:
-        raise PermissionDenied
-
-    code = user.invitation_code
-    if Profile.objects.filter(invitation_code=code).exists():
-        code_owner = Profile.objects.filter(invitation_code=code)[0]
-    else:
-        code_owner = None
-        if Profile.objects.all().count() >= settings.NO_CODE_REQUIRED_COUNT:
-            raise PermissionDenied
-
-    profile = Profile(user=user, parent=code_owner)
-    profile.save()
-    user.is_active = True
-    user.save()
-    login(request, user)
-    return redirect(profile)
-
-
-def signout_view(request):
-    logout(request)
-    return redirect('signin')
