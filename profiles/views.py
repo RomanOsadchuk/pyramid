@@ -70,7 +70,7 @@ class ProfileDetail(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         child_profiles = Profile.objects.filter(parent=self.object)
-        context['child_profiles'] = child_profiles
+        context['child_profiles'] = child_profiles.select_related('user')
         return context
 
 
